@@ -1,3 +1,4 @@
+#week 1
 install.packages('Matrix')
 library(Matrix)
 if (!require("BiocManager", quietly = TRUE))
@@ -52,3 +53,65 @@ gbox.pca.umap <- umap(pca$x)
 
 colours=rainbow(length(unique(clust)))
 plot(gbox.pca.umap$layout[,1], gbox.pca.umap$layout[,2], col=colours[clust[includeCells]], pch=20, main='PCA UMAP Rosette_21d', xlab='UMAP Component 1', ylab='UMAP Component 2')
+
+#week 3
+install.packages(c("Matrix","Rcpp","rlang","lattice","openssl"), force = TRUE)
+BiocManager::install("GENIE3", force = TRUE)
+library(Matrix)
+library(GENIE3)
+
+net=GENIE3(as.matrix(gbox), regulators = tfSubs, nTrees=5)
+save(net, file='Rosette_21d_network_nTree_5.RData')
+ginieOutput=convertToAdjacency(net, 0.05)
+dim(ginieOutput)
+ginieOutput[1:10,]
+
+a=load('Rosette_21d_network_nTree_5.RData')
+newNet=GENIE3::getLinkList(net)
+araboxcis=read.csv('data/gboxNetwork22C.csv', header=T)
+
+genesInNet=unique(c(newNet[,1], newNet[,2]))
+araboxcisFiltered=araboxcis[which(araboxcis[,1] %in% genesInNet & araboxcis[,2] %in% genesInNet),]
+newNetTopEdges=newNet[1:length(araboxcisFiltered[,1]),]
+edgesNew=paste(newNetTopEdges[,1], newNetTopEdges[,2], sep='_')
+edgesOld=paste(araboxcisFiltered[,1], araboxcisFiltered[,2], sep='_')
+length(which(edgesNew %in% edgesOld))
+length(which(! (edgesNew %in% edgesOld)))
+length(which(! (edgesOld %in% edgesNew)))
+
+tfsNew=table(newNetTopEdges[,1])
+tfsOld=table(araboxcisFiltered[,1])[names(tfsNew)]
+hist(as.numeric(tfsNew), main='SinceAraBOXcis', xlab='degree of TFs')
+plot(as.numeric(tfsNew), as.numeric(tfsOld), xlab='degree in SinceAraBOXcis', ylab='degree in AraBOXcis')
+sort(tfsNew, decreasing=TRUE)[1:20]
+
+install.packages('igraph')
+library(igraph)
+install.packages('network')
+library(network)
+install.packages('pheatmap')
+library(pheatmap)
+
+simple_network <- graph_from_edgelist(as.matrix(newNetTopEdges[,c(1,2)]))
+node_betweenness_all <- betweenness(simple_network)
+node_betweenness=node_betweenness_all[which(node_betweenness_all>0)]
+sort(node_betweenness, decreasing=TRUE)[1:20]
+plot(sort(node_betweenness))
+
+node_hub_all <- hub_score(simple_network)$vector
+node_hub=node_hub_all[which(node_hub_all>0)]
+sort(node_hub, decreasing=TRUE)[1:20]
+plot(sort(node_hub))
+plot(node_hub_all, node_centrality_all)
+plot(node_hub_all, node_betweenness_all)
+
+a=load('data/functionalData.RData')
+source('dev/utilities/dataprocessingHelperFunctions.R')
+pafwayOut=pafway(GOconcat, newNetTopEdges, unique(goOfInterest))
+rownames(pafwayOut)=colnames(pafwayOut)
+
+atLeastOneSigRow=which(apply(pafwayOut, 1, function(i){length(which(i<0.05))})>0)
+atLeastOneSigCol=which(apply(pafwayOut, 2, function(i){length(which(i<0.05))})>0)
+pafwayInterestingOnly=pafwayOut[atLeastOneSigRow, atLeastOneSigCol]
+pheatmap(pafwayInterestingOnly)
+pheatmap(log(pafwayInterestingOnly, 10))
