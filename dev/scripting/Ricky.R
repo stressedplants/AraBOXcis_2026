@@ -68,6 +68,19 @@ ginieOutput[1:10,]
 
 a=load('Rosette_21d_network_nTree_5.RData')
 newNet=GENIE3::getLinkList(net)
+top1000 = newNet[1:1000, ]
+colnames(top1000) = c("TF", "target", "score")
+top1000$dataset = "Rosette_21d"
+geneCounts = table(c(top1000$TF, top1000$target))
+validGenes = names(geneCounts[geneCounts > 1])
+top1000_filtered = top1000[
+  top1000$TF %in% validGenes &
+    top1000$target %in% validGenes, ]
+head(top1000_filtered)
+dim(top1000_filtered)
+View(top1000)
+write.csv(top1000, "top1000_edges.csv", row.names = FALSE)
+
 araboxcis=read.csv('data/gboxNetwork22C.csv', header=T)
 
 genesInNet=unique(c(newNet[,1], newNet[,2]))
